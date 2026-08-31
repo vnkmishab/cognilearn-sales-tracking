@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Workforce Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --navy:#1F4E78; --navy-dark:#123049; --accent:#2E86AB; --bg:#F4F6F8;
+    --card:#FFFFFF; --text:#1B2733; --muted:#5C6B7A; --line:#E3E8EC;
+    --green:#2E8B57; --amber:#C98A2B; --red:#C0392B;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:Arial, Helvetica, sans-serif;background:var(--bg);color:var(--text);}
+  header{background:linear-gradient(120deg,var(--navy),var(--navy-dark));color:#fff;padding:28px 32px;}
+  header h1{margin:0;font-size:24px;}
+  header p{margin:6px 0 0;font-size:13px;color:#cfe0ee;}
+  .wrap{padding:24px 32px 48px;max-width:1300px;margin:0 auto;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:24px;}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+  .kpi .label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);}
+  .kpi .value{font-size:26px;font-weight:700;color:var(--navy);margin-top:4px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;}
+  @media(max-width:900px){.grid{grid-template-columns:1fr;}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+  .card h3{margin:0 0 12px;font-size:14px;color:var(--navy);}
+  .card.full{grid-column:1/-1;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);}
+  th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px;}
+  tr:hover{background:#F8FAFB;}
+  .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;}
+  .APPROVED{background:var(--green);} .PENDING{background:var(--amber);} .REJECTED{background:var(--red);}
+  .note{background:#FFF7E6;border:1px solid #F2D48A;border-radius:8px;padding:12px 16px;font-size:12.5px;color:#6b5410;margin-bottom:22px;}
+  .note b{color:#4a3a08;}
+  canvas{max-height:260px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Workforce Operations Dashboard</h1>
+  <p>Attendance · Site Punches · Expenses — built from Attendance.csv, Employees.csv, Expenses.csv, SitePunches.csv</p>
+</header>
+<div class="wrap">
+
+  <div class="note">
+    <b>Data quality note:</b> Employees.csv has no Email/Role/Status values; SitePunches.csv has no punch-in/out times
+    (only GPS coordinates); no Sites table exists so sites are shown as short codes. Figures below reflect the source
+    data as-is.
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Attendance records by date</h3>
+      <canvas id="attByDate"></canvas>
+    </div>
+    <div class="card">
+      <h3>Attendance by employee</h3>
+      <canvas id="attByEmp"></canvas>
+    </div>
+    <div class="card">
+      <h3>Expense bill amount by category</h3>
+      <canvas id="expByCat"></canvas>
+    </div>
+    <div class="card">
+      <h3>Expense amount by approval status</h3>
+      <canvas id="expByStatus"></canvas>
+    </div>
+    <div class="card">
+      <h3>Site punches by site</h3>
+      <canvas id="punchBySite"></canvas>
+    </div>
+    <div class="card">
+      <h3>Site punches by employee</h3>
+      <canvas id="punchByEmp"></canvas>
+    </div>
+    <div class="card full">
+      <h3>Expense detail</h3>
+      <table id="expTable">
+        <thead><tr><th>Employee</th><th>Category</th><th>Bill Amount</th><th>Status</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA = {"kpis": {"employees": 10, "attendance_records": 64, "present_days": 64, "site_punches": 81, "total_bill": 878.44, "approved_bill": 195.5, "pending_bill": 4.71, "rejected_bill": 678.23}, "attendance_by_date": [["2026-08-14", 20], ["2026-08-15", 1], ["2026-08-16", 7], ["2026-08-17", 18], ["2026-08-18", 16], ["2026-08-20", 2]], "attendance_by_employee": [["John Doe", 37], ["Ian Anderson", 5], ["Alice Smith", 4], ["Fiona Rodriguez", 3], ["Charlie Miller", 3], ["Diana Davis", 3], ["George Wilson", 3], ["Ethan Garcia", 3], ["Hannah Martinez", 2], ["Bob Johnson", 1]], "expense_by_category": [["MATERIALS", 178.74], ["MEALS", 49.71], ["SUPPLIES", 320.75], ["TRAVEL", 329.24]], "expense_by_status": [["APPROVED", 195.5], ["PENDING", 4.71], ["REJECTED", 678.23]], "expense_rows": [["John Doe", "MEALS", 4.71, "PENDING"], ["John Doe", "SUPPLIES", 320.75, "REJECTED"], ["John Doe", "MEALS", 45.0, "APPROVED"], ["John Doe", "TRAVEL", 150.5, "APPROVED"], ["Alice Smith", "MATERIALS", 178.74, "REJECTED"], ["Bob Johnson", "TRAVEL", 178.74, "REJECTED"]], "punches_by_site": [["SITE-D302FE", 23], ["SITE-CD96AD", 19], ["SITE-D0979B", 16], ["SITE-CDFDD3", 13], ["SITE-E25AD9", 10]], "punches_by_employee": [["John Doe", 31], ["Alice Smith", 7], ["Ian Anderson", 7], ["Fiona Rodriguez", 6], ["Charlie Miller", 6], ["Diana Davis", 6], ["George Wilson", 6], ["Ethan Garcia", 6], ["Hannah Martinez", 4], ["Bob Johnson", 2]], "employees_list": [["John Doe", "EMP-0010"], ["Ian Anderson", "EMP-009"], ["Hannah Martinez", "EMP-008"], ["George Wilson", "EMP-007"], ["Fiona Rodriguez", "EMP-006"], ["Ethan Garcia", "EMP-005"], ["Diana Davis", "EMP-004"], ["Charlie Miller", "EMP-003"], ["Bob Johnson", "EMP-002"], ["Alice Smith", "EMP-001"]]};
+
+function fmt(n){ return '$' + n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+const kpiDefs = [
+  ["Employees", DATA.kpis.employees, ""],
+  ["Attendance Records", DATA.kpis.attendance_records, ""],
+  ["Present Days", DATA.kpis.present_days, ""],
+  ["Site Punches", DATA.kpis.site_punches, ""],
+  ["Total Billed", fmt(DATA.kpis.total_bill), ""],
+  ["Approved $", fmt(DATA.kpis.approved_bill), ""],
+  ["Pending $", fmt(DATA.kpis.pending_bill), ""],
+  ["Rejected $", fmt(DATA.kpis.rejected_bill), ""],
+];
+const kpiEl = document.getElementById('kpis');
+kpiDefs.forEach(([label,val])=>{
+  const d = document.createElement('div');
+  d.className='kpi';
+  d.innerHTML = `<div class="label">${label}</div><div class="value">${val}</div>`;
+  kpiEl.appendChild(d);
+});
+
+const palette = ['#2E86AB','#1F4E78','#5BA3C7','#8FC1DE','#C98A2B','#2E8B57','#C0392B','#7A6FBE'];
+Chart.defaults.font.family = 'Arial';
+Chart.defaults.color = '#5C6B7A';
+
+function bar(id, labels, values, color){
+  new Chart(document.getElementById(id), {
+    type:'bar',
+    data:{labels, datasets:[{data:values, backgroundColor: color || palette[0], borderRadius:4}]},
+    options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+  });
+}
+function line(id, labels, values){
+  new Chart(document.getElementById(id), {
+    type:'line',
+    data:{labels, datasets:[{data:values, borderColor:palette[1], backgroundColor:'rgba(31,78,120,0.12)', fill:true, tension:.3, pointRadius:4}]},
+    options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+  });
+}
+function doughnut(id, labels, values){
+  new Chart(document.getElementById(id), {
+    type:'doughnut',
+    data:{labels, datasets:[{data:values, backgroundColor:palette}]},
+    options:{plugins:{legend:{position:'right', labels:{boxWidth:12}}}}
+  });
+}
+
+line('attByDate', DATA.attendance_by_date.map(r=>r[0]), DATA.attendance_by_date.map(r=>r[1]));
+bar('attByEmp', DATA.attendance_by_employee.map(r=>r[0]), DATA.attendance_by_employee.map(r=>r[1]), palette[2]);
+bar('expByCat', DATA.expense_by_category.map(r=>r[0]), DATA.expense_by_category.map(r=>r[1]), palette[4]);
+doughnut('expByStatus', DATA.expense_by_status.map(r=>r[0]), DATA.expense_by_status.map(r=>r[1]));
+doughnut('punchBySite', DATA.punches_by_site.map(r=>r[0]), DATA.punches_by_site.map(r=>r[1]));
+bar('punchByEmp', DATA.punches_by_employee.map(r=>r[0]), DATA.punches_by_employee.map(r=>r[1]), palette[5]);
+
+const tbody = document.querySelector('#expTable tbody');
+DATA.expense_rows.forEach(r=>{
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${r[0]}</td><td>${r[1]}</td><td>${fmt(r[2])}</td><td><span class="badge ${r[3]}">${r[3]}</span></td>`;
+  tbody.appendChild(tr);
+});
+</script>
+</body>
+</html>

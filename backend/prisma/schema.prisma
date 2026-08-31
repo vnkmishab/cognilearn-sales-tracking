@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  role          String    @default("EMPLOYEE")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  employee      Employee?
+}
+
+model Employee {
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  employeeCode   String    @unique
+  firstName      String
+  lastName       String
+  isActive       Boolean   @default(true)
+  deletionReason String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user           User      @relation(fields: [userId], references: [id])
+  
+  attendanceEvents AttendanceEvent[]
+  sitePunches      SitePunch[]
+  expenses         Expense[]
+  assignments      SiteAssignment[]
+  notifications    Notification[]
+}
+
+model Site {
+  id             String    @id @default(uuid())
+  name           String
+  projectId      String?
+  address        String?
+  latitude       Float
+  longitude      Float
+  geofenceRadius Float     @default(100)
+  siteCode       String    @unique
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sitePunches    SitePunch[]
+  expenses       Expense[]
+  assignments    SiteAssignment[]
+}
+
+model AttendanceEvent {
+  id          String    @id @default(uuid())
+  employeeId  String
+  checkIn     DateTime
+  checkOut    DateTime?
+  status      String    @default("Present")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+}
+
+model SitePunch {
+  id             String    @id @default(uuid())
+  clientPunchId  String    @unique
+  employeeId     String
+  siteId         String
+  punchType      String
+  latitude       Float?
+  longitude      Float?
+  gpsAccuracy    Float?
+  deviceId       String?
+  syncedAt       DateTime  @default(now())
+
+  employee       Employee  @relation(fields: [employeeId], references: [id])
+  site           Site      @relation(fields: [siteId], references: [id])
+}
+
+model Expense {
+  id               String        @id @default(uuid())
+  expenseCode      String        @unique
+  employeeId       String
+  siteId           String?
+  category         String
+  billAmount       Float?
+  paymentAmount    Float?
+  description      String?
+  matchStatus      String?       // e.g., 'AMOUNT_MATCHED', 'AMOUNT_MISMATCH'
+  approvalStatus   String @default("DRAFT")
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  employee         Employee      @relation(fields: [employeeId], references: [id])
+  site             Site?         @relation(fields: [siteId], references: [id])
+  documents        ExpenseDocument[]
+}
+
+model ExpenseDocument {
+  id        String       @id @default(uuid())
+  expenseId String
+  type      String
+  url       String
+  createdAt DateTime     @default(now())
+
+  expense   Expense      @relation(fields: [expenseId], references: [id])
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  title      String
+  message    String
+  type       String   @default("INFO")
+  isRead     Boolean  @default(false)
+  employeeId String?
+  createdAt  DateTime @default(now())
+
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model SiteAssignment {
+  id         String   @id @default(uuid())
+  employeeId String
+  siteId     String
+  assignedAt DateTime @default(now())
+
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  site       Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, siteId])
+}

@@ -1,0 +1,34 @@
+# Dependency folders
+node_modules/
+.next/
+dist/
+build/
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+
+# SQLite databases
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Environments and credentials
+.env
+.env.local
+.env.production
+.env.development
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# IDE specific files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
